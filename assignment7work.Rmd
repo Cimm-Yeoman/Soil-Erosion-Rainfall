@@ -18,7 +18,7 @@ This data set includes 200 observations of rainfall and soil erosion measurement
 soil erosion from with a linear regression. Using this model, a prediction plot with a line of best fit 
 and 91% prediction interval will be made. This will be repeated with a Bayesian framework for comparison. 
 
-The rainfall and soil erosion set was imported into RSTudio and renamed **rain_ero**. 
+The rainfall and soil erosion set was imported into RStudio and renamed **rain_ero**. 
 
 ```{r, include = FALSE}
 library(rethinking)
