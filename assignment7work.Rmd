@@ -1,0 +1,265 @@
+---
+title: "Linear regression and Bayesian models: predicting soil erosion 48 hours after a rainfall event"
+author: "Cimmaron Yeoman"
+date: "2023-04-17"
+output: pdf_document
+html_document: default
+header-includes:
+    - \usepackage{sectsty}
+    - \allsectionsfont{\color{red}}
+---
+
+\vspace*{-10mm}
+
+### Introduction: rainfall and soil erosion measurements (mm) after 48 hours
+
+This data set includes 200 observations of rainfall and soil erosion measurements (mm) recorded
+48 hours later. This report will assess the relationship between soil erosion and rainfall, and predict 
+soil erosion from with a linear regression. Using this model, a prediction plot with a line of best fit 
+and 91% prediction interval will be made. This will be repeated with a Bayesian framework for comparison. 
+
+The rainfall and soil erosion set was imported into RSTudio and renamed **rain_ero**. 
+
+```{r, include = FALSE}
+library(rethinking)
+library(knitr)
+library(readr)
+rain_ero <- read_csv("soil_erosion.csv")
+```
+
+## Exploring the data
+
+The average amount of rainfall was **66.8 mm** and the average soil erosion was **35.87 mm**. 75% of 
+rainfall measurements were **103.3 mm** or less, and 75% of the soil erosion measurements were **48.0 mm** 
+or less. This information will be used to help define a grid for prediction intervals and HPDI (highest 
+probability density intervals). 
+
+```{r, echo = FALSE, collaps = TRUE}
+summary(rain_ero)
+```
+
+There were no signs of extreme values in the distributions of either variable.
+
+**Figure 1**
+\vspace*{-10mm}
+```{r, out.width= "250px", out.height= "275px", echo = FALSE}
+hist(rain_ero$rainfall_mm, col = "royalblue1", main = NULL, xlim = c(0, 150), 
+     ylim = c(0, 50), breaks = seq(0, 150, 25), xaxp = c(0, 150, 6),
+     xlab = "Rainfall (mm)", font.lab = 2)
+boxplot(rain_ero$rainfall_mm, col = "royalblue1")
+title(ylab = "Rainfall (mm)", xlab = "X", font.lab = 2)
+```
+
+**Figure 2**
+\vspace*{-10mm}
+```{r, out.width= "250px", out.height= "275px", echo = FALSE }
+hist(rain_ero$soil_erosion_mm, col = "sandybrown", main = NULL, xlim = c(0, 80),
+     ylim = c(0, 50), breaks = seq(0, 80, 10), xaxp = c(0, 80, 8),
+     xlab = "Soil erosion (mm)", font.lab = 2)
+boxplot(rain_ero$soil_erosion_mm, col = "sandybrown")
+title(ylab = "Soil erosion (mm)", xlab = "Y", font.lab = 2)
+```
+
+## A simple linear model 
+
+First, we will predict the response of soil erosion in millimeters, from the amount of rainfall 48 hours prior. 
+
+```{r}
+modRE1 <- lm(soil_erosion_mm ~ rainfall_mm, data = rain_ero)
+```
+
+```{r, echo = FALSE, collapse = TRUE}
+summary(modRE1)$coefficients
+```
+
+```{r, include = FALSE}
+modRE1_adjR2 <- summary(modRE1)$adj.r.squared * 100
+```
+
+Model **modRE1** had an adjusted $R^2$ of `r round(modRE1_adjR2, 1)`% variation explained,
+indicating a strong, positive correlation. From the coefficients we can see that as 
+soil erosion increases, rainfall also increases. 
+
+## Prediction plot 
+
+Figure 3 is a prediction plot of the data set with **modRE1** as the line of best fit, 
+and 91% HPDI and prediction intervals. The prediction interval shows the area where 
+**modRE1** expects to find 91% of the true soil erosion values at each rainfall amount. 
+
+**Figure 3**
+\vspace*{-10mm}
+```{r, echo = FALSE, out.width = '65%'}
+plot(soil_erosion_mm ~ rainfall_mm, data = rain_ero, col = "navy", 
+     xlab = "Rainfall (mm)", ylab = "Soil erosion (mm)", xlim = c(0, 150), 
+     ylim = c(0, 80), pch = 20, font.lab = 2)
+abline(modRE1, col = "red", lty = 1, lwd = 1) 
+newdat <- seq(-10, 160, by = 0.5)
+conf_int <- predict(modRE1, newdata=data.frame(rainfall_mm = newdat), 
+                    interval="confidence", level = 0.91)
+lines(newdat, conf_int[,2], col="green2", lty = 5)
+lines(newdat, conf_int[,3], col="green2", lty = 5)
+pred_int <- predict(modRE1, newdata = data.frame(rainfall_mm = newdat), 
+                    interval="prediction", level = 0.91)
+lines(newdat, pred_int[,2], col="gold2", lty = 5) 
+lines(newdat, pred_int[,3], col="gold2", lty = 5)
+legend("topleft", inset = 0.05, legend = c("Line of best fit", 
+                  "Prediction interval (91%)", "HPDI (91%)"), 
+                   col=c("red", "gold2", "green2"), lty = c(1,5,5), cex = 0.8, 
+                   bg = "lightcyan1", text.font = 2)
+```
+
+**Figure 4**
+\vspace*{-10mm}
+```{r, warning = FALSE, message = FALSE, echo = FALSE, out.width = '65%', results='hide', fig.keep = 'last'}
+rainfall_mm.seq <- seq(from = -10, to = 160, by = 15)
+mu <- link(modRE1, data = data.frame(modRE1 = rainfall_mm.seq))
+mu.mean1 <- apply(mu, MAR = 2, FUN = mean)
+mu.HPDI1 <- apply(mu, MAR = 2, FUN = HPDI, prob = 0.91)
+sim.ero <- sim(modRE1, data = data.frame(modRE1 = rainfall_mm.seq))
+ero.PI <- apply(sim.ero, MAR = 2, FUN = PI, prob = 0.91)
+plot(soil_erosion_mm ~ rainfall_mm, data = rain_ero, 
+     col = "navy", xlab = "Rainfall (mm)", ylab = "Soil erosion (mm)", 
+     pch = 20, font.lab = 2)
+shade(mu.HPDI1, rainfall_mm.seq, col = col.alpha("green2", 0.15))
+shade(ero.PI, rainfall_mm.seq, col = col.alpha("gold2", 0.2) )
+lines(rainfall_mm.seq, mu.mean1, col = "red", lty = 1, lwd = 1)
+legend("topleft", inset = 0.05, legend = c("Line of best fit", 
+          "Prediction interval shade (91%)", "HPDI shade (91%)"), 
+           col=c("red", "gold2", "green2"), lty = c(1,5,5), cex = 0.8, 
+           bg = "lightcyan1", text.font = 2)
+```
+
+Figure 4 is a replica of Figure 3, using the shade function to indicate the prediction and 
+HPDI areas, at 91%. 
+
+## Parametric confidence intervals
+
+These are the parametric confidence interval limits for **modRE1**. If this study were conducted and
+analyzed many times over, then 91% of the intervals calculated would include the true values of the parameters 
+(our model coefficients). This is only conditional on the particular model, **modeRE1**, if I am correct. 
+I base these assumptions off of the theory described in Statistical Rethinking, as confidence intervals
+are often misinterpreted (I am guilty here). 
+
+```{r, echo = FALSE}
+confint(modRE1, level = 0.91)
+```
+
+## Bayesian framework
+
+### Basic, non-specific priors
+
+For this model, I started with basic priors for the parameters to assess. This Bayesian
+model was almost exactly the same as the basic linear model. The intercept and slope 
+were quite similar to **modRE1** (**0.334** versus **0.333**, **13.565** versus **13.599**). Sigma
+can be compared to the residual standard error of **modRE1** (**7.78** versus **7.82**). 
+
+```{r, collapse = TRUE}
+modRE_B <- map(alist(
+              soil_erosion_mm ~ dnorm(mu, sigma),
+              mu <- a + b * rainfall_mm,   
+              a ~ dnorm(0, 20), 
+              b ~ dnorm(0, 20),
+              sigma ~ dunif(0, 100)
+           ),
+           data = rain_ero)
+```
+
+```{r, collapse = TRUE, echo = FALSE}
+precis(modRE_B, digits = 3, prob = 0.91)
+```
+
+## Specifiying values 
+
+We can modify the slope, intercept, and sigma values to try and create more informative priors. 
+In **modRE2**, I have changed the priors to be much more specific. As an environmental science
+major I know a bit about dirt and rain, and I have have the knowledge that there is a positive
+relationship between these variables. Even though I have a basic understanding of the data, I did not 
+have to examine samples to create more specific priors. The priors I chose below make **modRE2** 
+even more similar to **modRE1**. 
+
+The sigma value (**7.780**) says that 91% of the possible soil erosion amounts fall within two standard
+deviations of the mean soil erosion amount (**35.87 mm** according to our initial summary of 
+soil erosion). The table below also includes uncertainty of sigma, which has a 91% interval of **7.121** to **8.440**
+
+```{r}
+modRE2 <- map(alist(
+              soil_erosion_mm ~ dnorm(mu, sigma),
+              mu <- a + b * rainfall_mm,  
+              a ~ dnorm(10, 18), 
+              b ~ dnorm(0, 5),
+              sigma ~ dunif(0,8)
+           ),
+           data = rain_ero)
+```
+
+```{r, collapse = TRUE, echo = FALSE}
+precis(modRE2, digits = 3, prob = 0.91)
+```
+
+## Bayesian model prediction plot
+
+The Bayesian model prediction plot (Figure 3) is indistinguishable from the simple linear regression
+prediction plot, as there was very little difference between the **modRE1** and **modRE2** values. 
+The line of best fit can be considered the average of the population mean values. The HPDI
+shade is sort of like a confidence interval for the expected mean values. As mentioned for Figure 3, 
+the prediction interval captures the area on the plot where the Bayesian model (**modRE2**) 
+expects to find 91% of the actual soil erosion values, at specific rainfall amounts.
+
+**Figure 5**
+\vspace*{-10mm}
+```{r, echo = FALSE, out.width = '65%', collapse = TRUE}
+rainfall_mm.seq2 <- seq(from = -10, to = 160, by = 15)
+mu2 <- link(modRE2, data = data.frame(rainfall_mm = rainfall_mm.seq2))
+mu.mean2 <- apply(mu2, MAR = 2, FUN = mean)
+mu.HPDI2 <- apply(mu2, MAR = 2, FUN = HPDI, prob = 0.91)
+sim.ero2 <- sim(modRE2, data = data.frame(rainfall_mm = rainfall_mm.seq2))
+ero.PI2 <- apply(sim.ero2, MAR = 2, FUN = PI, prob = 0.91)
+plot(soil_erosion_mm ~ rainfall_mm, data = rain_ero, 
+     col = "navy", xlab = "Rainfall (mm)", ylab = "Soil erosion (mm)", 
+     pch = 20, font.lab = 2)
+abline(a = coef(modRE2)["a"],
+       b = coef(modRE2)["b"], col = "red")
+shade(mu.HPDI2, rainfall_mm.seq2, col = col.alpha("green2", 0.15))
+shade(ero.PI2, rainfall_mm.seq2, col = col.alpha("gold2", 0.2))
+legend("topleft", inset = 0.05, legend = c("Line of best fit", 
+          "Prediction interval shade (91%)", "HPDI shade (91%)"), 
+           col=c("red", "gold2", "green2"), lty = c(1,5,5), cex = 0.8, 
+           bg = "lightcyan1", text.font = 2)
+```
+
+```{r, echo = FALSE, collapse = TRUE}
+precis(modRE2, digits = 3, prob = 0.91)
+```
+
+### Providing less helpful values
+
+In **modRE2**, I first experimented with different prior values that were uninformative
+and a bit wacky. At a certain point, the model will not run and a message will prompt
+you to change your values. If you change the slope and intercept, the data still overpowers
+the uninformative priors, and the values do not change much. Sigma seems much more sensitive
+to any extreme changes and produces an error code more often. 
+
+## Conclusion
+
+The choice of priors in a Bayesian linear model appear to be reasonably flexible and forgiving,
+at least for this report and data set. There are various acceptable priors, and many of them produce 
+models comparable to the simple linear regression, with similar parameter values. This does not 
+make priors useless though. Well thought priors can help us produce useful models with parameters which
+are not nonsensical. In this report, basic soil science and physics concepts would act as the knowledge
+source to create our priors. I think most people even without high level knowledge on this topic 
+would agree that it would not make sense for a torrential downpour to cause no erosion, especially on a fluffy
+soils, ill-protected from the eroding actions of rain or wind. Changing the priors also lets us explore different 
+models and how their parameters change when our initial information is different. 
+
+Both highly specific and unspecific priors still may potentially influence model parameters,
+even if most of the time the data or samples can overcome a wackier prior. Priors and posteriors
+are important to consider especially in more serious, practical applications such as a medical 
+tests for a rare or life-threatening disease. It would be wise to consider the likelihood of 
+a patient receiving a positive result for the disease, according to the population diagnostic rate for example.
+Facts making the individual an even more likely candidate for a true positive result would also be valuable 
+(relevant symptoms most likely). Priors allow us to give our model useful information before we look at
+the data, allowing us to include our assumptions and knowledge, without secretly observing a sample 
+and deciding on priors to produce a certain outcome (this is not a good idea!). 
+
+
+
