@@ -1,2 +1,2 @@
 # Soil-Erosion-Rainfall
-This data set includes 200 observations of rainfall and soil erosion measurements (mm) recorded 48 hours later. This report will assess the relationship between soil erosion and rainfall, and predict soil erosion from with a linear regression. 
+This data set includes 200 observations of rainfall and soil erosion measurements (mm) recorded 48 hours later. This report will assess the relationship between soil erosion and rainfall, and predict soil erosion from with a linear regression. Using this model, a prediction plot with a line of best fit and 91% prediction interval will be made. This will be repeated with a Bayesian framework for comparison. 
